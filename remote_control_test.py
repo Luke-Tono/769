@@ -148,33 +148,31 @@ class ServoRequestHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header('Content-type', content_type)
         self.send_header('Access-Control-Allow-Origin', '*')  # 允许跨域请求
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
         self.end_headers()
     
     def _set_error_headers(self, error_code=400):
         self.send_response(error_code)
         self.send_header('Content-type', 'application/json')
         self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
         self.end_headers()
     
     def do_GET(self):
         parsed_path = urlparse(self.path)
         path = parsed_path.path
         
-        # 处理前端页面请求
-        if path == '/' or path == '/index.html':
-            self._set_headers('text/html')
-            with open('index.html', 'rb') as file:
-                self.wfile.write(file.read())
-            return
-        
-        # 处理API请求
+        # 只处理API请求，因为前端页面是从客户端电脑上加载的
         if path == '/api/get_angle':
             self._set_headers('application/json')
             response = json.dumps({"angle": current_angle})
             self.wfile.write(response.encode())
         else:
             self._set_error_headers(404)
-            self.wfile.write(json.dumps({"status": "error", "message": "未找到请求的资源"}).encode())
+            response = json.dumps({"status": "error", "message": "未找到请求的资源"})
+            self.wfile.write(response.encode())
     
     def do_POST(self):
         content_length = int(self.headers['Content-Length'])
@@ -212,12 +210,8 @@ class ServoRequestHandler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps({"status": "error", "message": "无效的JSON数据"}).encode())
     
     def do_OPTIONS(self):
-        # 处理预检请求
-        self.send_response(200)
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
-        self.end_headers()
+        # 处理预检请求，对跨域请求非常重要
+        self._set_headers()
 
 # 主函数
 def main():
@@ -233,8 +227,10 @@ def main():
         # 启动Web服务器
         server_address = ('', PORT)
         httpd = HTTPServer(server_address, ServoRequestHandler)
-        print(f"伺服电机控制系统已启动！")
-        print(f"访问地址: http://{ip_address}:{PORT}")
+        print(f"伺服电机API服务已启动！")
+        print(f"API地址: http://{ip_address}:{PORT}")
+        print(f"请确保前端页面中的API_BASE_URL设置为: 'http://{ip_address}:{PORT}'")
+        print(f"按Ctrl+C退出")
         httpd.serve_forever()
         
     except KeyboardInterrupt:
